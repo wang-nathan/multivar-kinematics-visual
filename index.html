@@ -10,6 +10,12 @@
 </head>
 <body>
 
+    <div id="stats-panel" style="position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #00ffcc; padding: 12px 20px; border: 2px solid #00ffcc; border-radius: 8px; font-family: monospace; font-size: 14px; z-index: 100; min-width: 400px; text-align: center;">
+        <div style="font-weight: bold; margin-bottom: 8px;">—— Vector Magnitudes ——</div>
+        <div>T: <span id="stat-t">0.000</span> | N: <span id="stat-n">0.000</span> | B: <span id="stat-b">0.000</span></div>
+        <div style="margin-top: 8px; font-size: 12px; color: #88ff88;">R: <span id="stat-r">3.0</span> | P: <span id="stat-p">0.8</span> | Speed: <span id="stat-speed">0.030</span> | Loops: <span id="stat-loops">12</span></div>
+    </div>
+
     <div id="ui-panel">
         <h2>TNB Rollercoaster</h2>
         
@@ -17,6 +23,7 @@
         
         <div class="control-group">
             <button id="btn-play">Pause Simulation</button>
+            <button id="btn-reset-camera">Reset Camera</button>
         </div>
 
         <div class="control-group">
@@ -33,6 +40,13 @@
             <label>Radius (R) <input type="range" id="slider-r" min="1" max="6" step="0.1" value="3"></label>
             <label>Pitch (P) <input type="range" id="slider-p" min="0.2" max="3" step="0.1" value="0.8"></label>
             <label>Speed <input type="range" id="slider-speed" min="0.01" max="0.1" step="0.01" value="0.03"></label>
+            <label>Loops <input type="range" id="slider-loops" min="6" max="30" step="1" value="12"></label>
+            <label>Auto-Speed <input type="checkbox" id="check-auto-speed"></label>
+            <label>Auto-View <input type="checkbox" id="check-auto-view"></label>
+            <label>Auto-Radius <input type="checkbox" id="check-auto-r"></label>
+            <label>Auto-Pitch <input type="checkbox" id="check-auto-p"></label>
+            <label>Auto-Speed Slider <input type="checkbox" id="check-auto-s"></label>
+            <label>Rainbow Colors <input type="checkbox" id="check-rainbow"></label>
         </div>
 
         <div class="control-group">
@@ -63,6 +77,12 @@
             <label>Show Normal (N) <input type="checkbox" id="check-n" checked></label>
             <label>Show Bi-normal (B) <input type="checkbox" id="check-b" checked></label>
         </div>
+
+        <div class="control-group">
+            <label>Tangent Scale <input type="range" id="slider-tangent-scale" min="0.1" max="2" step="0.1" value="0.3"></label>
+            <label>Normal Scale <input type="range" id="slider-normal-scale" min="0.1" max="10" step="0.1" value="2"></label>
+            <label>Binormal Scale <input type="range" id="slider-binormal-scale" min="0.05" max="1" step="0.05" value="0.2"></label>
+        </div>
     </div>
 
     <script>
@@ -79,6 +99,9 @@
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.autoRotate = false;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -112,6 +135,51 @@
             return sprite;
         }
 
+        function updateLargeTextSprite(sprite, message, color, isLongWord = false) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = isLongWord ? 512 : 256;
+            canvas.height = 256;
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.font = isLongWord ? 'Bold 25px Times New Roman' : 'Bold 120px Arial';
+            context.fillStyle = color;
+            context.textAlign = 'center';
+            context.fillText(message, canvas.width / 2, 160);
+            const texture = new THREE.CanvasTexture(canvas);
+            sprite.material.map = texture;
+            sprite.material.needsUpdate = true;
+        }
+
+        function createSmallTextSprite(message, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'Bold 24px Arial';
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.fillText(message, canvas.width / 2, 40);
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+            const spr = new THREE.Sprite(mat);
+            spr.scale.set(1.2, 0.3, 1);
+            return spr;
+        }
+
+        function updateSpriteText(sprite, message, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'Bold 24px Arial';
+            ctx.fillStyle = color || '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.fillText(message, canvas.width / 2, 40);
+            const tex = new THREE.CanvasTexture(canvas);
+            sprite.material.map = tex;
+            sprite.material.needsUpdate = true;
+        }
+
         const spriteX = createTextSprite("X", "#ff5555"); spriteX.position.set(9, 0, 0); scene.add(spriteX);
         const spriteY = createTextSprite("Y", "#55ff55"); spriteY.position.set(0, 9, 0); scene.add(spriteY);
         const spriteZ = createTextSprite("Z", "#5555ff"); spriteZ.position.set(0, 0, 9); scene.add(spriteZ);
@@ -119,11 +187,18 @@
         const spriteT = createTextSprite("Tangent", "#ff5555", true); scene.add(spriteT);
         const spriteN = createTextSprite("Normal", "#55ff55", true); scene.add(spriteN);
         const spriteB = createTextSprite("Bi-normal", "#5555ff", true); scene.add(spriteB);
+        const spriteTVal = createSmallTextSprite('T: 0.00', '#ff5555'); scene.add(spriteTVal);
+        const spriteNVal = createSmallTextSprite('N: 0.00', '#55ff55'); scene.add(spriteNVal);
+        const spriteBVal = createSmallTextSprite('B: 0.00', '#5555ff'); scene.add(spriteBVal);
 
         let R = 3.0; 
         let P = 0.8; 
         let helixAxis = 'z'; 
-        const maxT = 8 * Math.PI; 
+        let loopCount = 12;
+
+        function getMaxT() {
+            return loopCount * 2 * Math.PI;
+        }
         
         const trackGroup = new THREE.Group();
         scene.add(trackGroup);
@@ -166,7 +241,10 @@
         scene.add(trailLine);
 
         const arrowLength = 2.5;
-        const labelOffset = 2.8; 
+        const labelOffsetDefault = 2.8; 
+        let arrowScale = 0.3; // scale factor for tangent length
+        let normalScale = 2.0; // scale factor for normal (curvature) length
+        let binormalScale = 0.2; // scale factor for binormal length
 
         const arrowT = new THREE.ArrowHelper(new THREE.Vector3(1,0,0), new THREE.Vector3(0,0,0), arrowLength, 0xff5555, 0.5, 0.3);
         const arrowN = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,0), arrowLength, 0x55ff55, 0.5, 0.3);
@@ -177,24 +255,33 @@
             const magV = Math.sqrt(R*R + P*P);
             const cos = Math.cos(t);
             const sin = Math.sin(t);
-            let pos, T, N;
+            let pos, T, N, B, rPrime, rDouble, speed;
 
             if (helixAxis === 'z') {
                 pos = new THREE.Vector3(R * cos, R * sin, P * t);
-                T = new THREE.Vector3(-R * sin / magV, R * cos / magV, P / magV);
-                N = new THREE.Vector3(-cos, -sin, 0);
+                rPrime = new THREE.Vector3(-R * sin, R * cos, P);
+                rDouble = new THREE.Vector3(-R * cos, -R * sin, 0);
+                speed = rPrime.length();
+                T = rPrime.clone().normalize();
+                N = new THREE.Vector3(-cos, -sin, 0).normalize();
             } else if (helixAxis === 'y') {
                 pos = new THREE.Vector3(R * cos, P * t, R * sin);
-                T = new THREE.Vector3(-R * sin / magV, P / magV, R * cos / magV);
-                N = new THREE.Vector3(-cos, 0, -sin);
+                rPrime = new THREE.Vector3(-R * sin, P, R * cos);
+                rDouble = new THREE.Vector3(-R * cos, 0, -R * sin);
+                speed = rPrime.length();
+                T = rPrime.clone().normalize();
+                N = new THREE.Vector3(-cos, 0, -sin).normalize();
             } else if (helixAxis === 'x') {
                 pos = new THREE.Vector3(P * t, R * cos, R * sin);
-                T = new THREE.Vector3(P / magV, -R * sin / magV, R * cos / magV);
-                N = new THREE.Vector3(0, -cos, -sin);
+                rPrime = new THREE.Vector3(P, -R * sin, R * cos);
+                rDouble = new THREE.Vector3(0, -R * cos, -R * sin);
+                speed = rPrime.length();
+                T = rPrime.clone().normalize();
+                N = new THREE.Vector3(0, -cos, -sin).normalize();
             }
 
-            const B = new THREE.Vector3().crossVectors(T, N).normalize();
-            return { pos, T, N, B };
+            B = new THREE.Vector3().crossVectors(T, N).normalize();
+            return { pos, T, N, B, rPrime, rDouble, speed };
         }
 
         function updateEquationDisplay() {
@@ -214,7 +301,7 @@
             const pointsRail2 = [];
             const trackWidth = 0.6; 
 
-            for (let t = 0; t <= maxT; t += 0.05) {
+            for (let t = 0; t <= getMaxT(); t += 0.05) {
                 const { pos, B } = getTNB(t);
                 pointsCenter.push(pos.clone());
                 const offset = B.clone().multiplyScalar(trackWidth / 2);
@@ -233,31 +320,79 @@
             } else if (trackStyle === 'tube') {
                 class HelixCurve extends THREE.Curve {
                     getPoint(t, optionalTarget = new THREE.Vector3()) {
-                        const angle = t * maxT;
+                        const angle = t * getMaxT();
                         return optionalTarget.copy(getTNB(angle).pos);
                     }
                 }
                 trackGroup.add(new THREE.Mesh(new THREE.TubeGeometry(new HelixCurve(), 200, 0.2, 8, false), tubeMaterial));
             }
 
-            const midPoint = getTNB(maxT / 2).pos;
-            controls.target.copy(midPoint);
+            const midPoint = getTNB(getMaxT() / 2).pos;
+            if (!autoView) {
+                controls.target.copy(midPoint);
+            }
             controls.update();
         }
 
         let isPlaying = true;
-        let speed = 0.03;
-
+        const defaultAnimSpeed = 0.03;
+        let speed = defaultAnimSpeed;
+        let autoSpeed = false;
+        let autoView = false; // disabled by default
+        let autoAdjustR = false;
+        let autoAdjustP = false;
+        let autoAdjustS = false;
+        let rainbowColors = false;
+        const autoSpeedMin = 0.01, autoSpeedMax = 0.09, autoSpeedFreq = 0.8;
+        const autoAdjustMax = { r: 5.5, p: 2.8 };
+        const originals = { r: 3.0, p: 0.8, s: defaultAnimSpeed };
+        const clock = new THREE.Clock();
         document.getElementById('btn-play').addEventListener('click', (e) => {
             isPlaying = !isPlaying;
             e.target.innerText = isPlaying ? "Pause Simulation" : "Play Simulation";
         });
+        document.getElementById('btn-reset-camera').addEventListener('click', () => {
+            camera.position.set(12, 12, 10);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
         document.getElementById('slider-speed').addEventListener('input', (e) => speed = parseFloat(e.target.value));
+        document.getElementById('check-auto-speed').addEventListener('change', (e) => {
+            autoSpeed = e.target.checked;
+            document.getElementById('slider-speed').disabled = autoSpeed;
+        });
+        document.getElementById('check-auto-view').addEventListener('change', (e) => {
+            autoView = e.target.checked;
+        });
+        document.getElementById('check-rainbow').addEventListener('change', (e) => {
+            rainbowColors = e.target.checked;
+        });
+        document.getElementById('check-auto-r').addEventListener('change', (e) => {
+            autoAdjustR = e.target.checked;
+            if (autoAdjustR) originals.r = R;
+        });
+        document.getElementById('check-auto-p').addEventListener('change', (e) => {
+            autoAdjustP = e.target.checked;
+            if (autoAdjustP) originals.p = P;
+        });
+        document.getElementById('check-auto-s').addEventListener('change', (e) => {
+            autoAdjustS = e.target.checked;
+            if (autoAdjustS) {
+                originals.s = speed;
+                autoSpeed = false;
+                const autoSpeedCheck = document.getElementById('check-auto-speed');
+                autoSpeedCheck.checked = false;
+                autoSpeedCheck.disabled = true;
+            } else {
+                document.getElementById('check-auto-speed').disabled = false;
+            }
+        });
         document.getElementById('select-axis').addEventListener('change', (e) => {
             helixAxis = e.target.value; updateEquationDisplay(); rebuildTrack();
         });
-        document.getElementById('slider-r').addEventListener('input', (e) => { R = parseFloat(e.target.value); updateEquationDisplay(); rebuildTrack(); });
-        document.getElementById('slider-p').addEventListener('input', (e) => { P = parseFloat(e.target.value); updateEquationDisplay(); rebuildTrack(); });
+        document.getElementById('slider-r').addEventListener('input', (e) => { R = parseFloat(e.target.value); if (!autoAdjustR) originals.r = R; updateEquationDisplay(); rebuildTrack(); });
+        document.getElementById('slider-p').addEventListener('input', (e) => { P = parseFloat(e.target.value); if (!autoAdjustP) originals.p = P; updateEquationDisplay(); rebuildTrack(); });
+        document.getElementById('slider-loops').addEventListener('input', (e) => { loopCount = parseInt(e.target.value, 10); rebuildTrack(); });
         document.getElementById('select-track').addEventListener('change', rebuildTrack);
         
         document.getElementById('select-cart').addEventListener('change', (e) => {
@@ -288,6 +423,10 @@
         document.getElementById('check-n').addEventListener('change', (e) => { arrowN.visible = e.target.checked; spriteN.visible = e.target.checked; });
         document.getElementById('check-b').addEventListener('change', (e) => { arrowB.visible = e.target.checked; spriteB.visible = e.target.checked; });
 
+        document.getElementById('slider-tangent-scale').addEventListener('input', (e) => arrowScale = parseFloat(e.target.value));
+        document.getElementById('slider-normal-scale').addEventListener('input', (e) => normalScale = parseFloat(e.target.value));
+        document.getElementById('slider-binormal-scale').addEventListener('input', (e) => binormalScale = parseFloat(e.target.value));
+
         updateEquationDisplay();
         rebuildTrack();
 
@@ -296,12 +435,52 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            if (isPlaying) {
-                currentTime += speed;
-                if (currentTime > maxT) currentTime = 0; 
+            // update animation speed when autoSpeed enabled
+            if (autoSpeed && !autoAdjustS) {
+                const tClock = clock.getElapsedTime();
+                const s = (Math.sin(tClock * autoSpeedFreq) + 1) / 2; // 0..1
+                speed = autoSpeedMin + s * (autoSpeedMax - autoSpeedMin);
+                const slider = document.getElementById('slider-speed');
+                if (slider) slider.value = speed;
             }
 
-            const { pos, T, N, B } = getTNB(currentTime);
+            // Independent Auto-Adjust controls for R/P/Speed sliders.
+            let geometryChanged = false;
+            if (autoAdjustR || autoAdjustP || autoAdjustS) {
+                const tClock = clock.getElapsedTime();
+                if (autoAdjustR) {
+                    const phaseR = (Math.sin(tClock * 0.45) + 1) / 2;
+                    R = originals.r + (autoAdjustMax.r - originals.r) * phaseR;
+                    const sliderR = document.getElementById('slider-r');
+                    if (sliderR) sliderR.value = R;
+                    geometryChanged = true;
+                }
+                if (autoAdjustP) {
+                    const phaseP = (Math.sin(tClock * 0.37 + 1.1) + 1) / 2;
+                    P = originals.p + (autoAdjustMax.p - originals.p) * phaseP;
+                    const sliderP = document.getElementById('slider-p');
+                    if (sliderP) sliderP.value = P;
+                    geometryChanged = true;
+                }
+                if (autoAdjustS) {
+                    const phaseS = (Math.sin(tClock * 0.55 + 2.1) + 1) / 2;
+                    speed = originals.s + (autoSpeedMax - originals.s) * phaseS;
+                    const sliderS = document.getElementById('slider-speed');
+                    if (sliderS) sliderS.value = speed;
+                }
+            }
+
+            if (geometryChanged) {
+                updateEquationDisplay();
+                rebuildTrack();
+            }
+
+            if (isPlaying) {
+                currentTime += speed;
+                if (currentTime > getMaxT()) currentTime = 0; 
+            }
+
+            const { pos, T, N, B, rPrime, rDouble, speed: tangentSpeed } = getTNB(currentTime);
             
             cartGroup.position.copy(pos);
             cartLight.position.copy(pos);
@@ -313,9 +492,106 @@
             arrowT.position.copy(pos); arrowN.position.copy(pos); arrowB.position.copy(pos);
             arrowT.setDirection(T); arrowN.setDirection(N); arrowB.setDirection(B);
 
-            spriteT.position.copy(pos).add(T.clone().multiplyScalar(labelOffset));
-            spriteN.position.copy(pos).add(N.clone().multiplyScalar(labelOffset));
-            spriteB.position.copy(pos).add(B.clone().multiplyScalar(labelOffset));
+            // compute curvature kappa = |r' x r''| / |r'|^3 (guard against zero)
+            let kappa = 0;
+            if (rPrime && rDouble) {
+                const crossMag = rPrime.clone().cross(rDouble).length();
+                if (tangentSpeed > 1e-6) kappa = crossMag / Math.pow(tangentSpeed, 3);
+            }
+
+            // lengths scaled to reflect actual magnitudes (reduced scale for clarity)
+            const defaultSpeedMag = Math.sqrt(originals.r * originals.r + originals.p * originals.p);
+            const defaultKappa = originals.r / (originals.r * originals.r + originals.p * originals.p);
+            const minTangentLength = defaultSpeedMag * arrowScale * 3.0;
+            const minNormalLength = defaultKappa * normalScale * 2.7;
+            const minBinormalLength = defaultSpeedMag * binormalScale * 2.7;
+
+            const baseTangent = tangentSpeed * arrowScale * 3.0;
+            const baseNormal = kappa * normalScale * 2.7;
+            const baseBinormal = tangentSpeed * binormalScale * 2.7;
+
+            const rDelta = Math.abs(R - originals.r) / Math.max(0.001, originals.r);
+            const pDelta = Math.abs(P - originals.p) / Math.max(0.001, originals.p);
+            const sDelta = Math.abs(speed - originals.s) / Math.max(0.001, originals.s);
+            const growthFactor = 1 + Math.min(1.5, (rDelta + pDelta + sDelta) / 3) * 1.2;
+
+            const tangentLength = Math.max(minTangentLength, baseTangent * growthFactor);
+            const normalLength = Math.max(minNormalLength, baseNormal * growthFactor);
+            const binormalLength = Math.max(minBinormalLength, baseBinormal * growthFactor);
+
+            let tColor = '#ff5555', nColor = '#55ff55', bColor = '#5555ff';
+            if (rainbowColors) {
+                const hue = (clock.getElapsedTime() * 0.15) % 1;
+                const tCol = new THREE.Color().setHSL(hue, 1.0, 0.6);
+                const nCol = new THREE.Color().setHSL((hue + 0.33) % 1, 1.0, 0.6);
+                const bCol = new THREE.Color().setHSL((hue + 0.66) % 1, 1.0, 0.6);
+                arrowT.setColor(tCol);
+                arrowN.setColor(nCol);
+                arrowB.setColor(bCol);
+                tColor = '#' + tCol.getHexString();
+                nColor = '#' + nCol.getHexString();
+                bColor = '#' + bCol.getHexString();
+            } else {
+                arrowT.setColor(0xff5555);
+                arrowN.setColor(0x55ff55);
+                arrowB.setColor(0x5555ff);
+            }
+
+            const headLenT = Math.max(0.12, tangentLength * 0.18);
+            const headWidT = headLenT * 0.6;
+            const headLenN = Math.max(0.08, normalLength * 0.18);
+            const headWidN = headLenN * 0.6;
+            const headLenB = Math.max(0.08, binormalLength * 0.18);
+            const headWidB = headLenB * 0.6;
+
+            arrowT.setLength(Math.max(0.05, tangentLength), headLenT, headWidT);
+            arrowN.setLength(Math.max(0.02, normalLength), headLenN, headWidN);
+            arrowB.setLength(Math.max(0.02, binormalLength), headLenB, headWidB);
+
+            // place main text labels a bit beyond the arrow tips
+            const tipTPos = pos.clone().add(T.clone().multiplyScalar(tangentLength + 0.15));
+            const tipNPos = pos.clone().add(N.clone().multiplyScalar(normalLength + 0.15));
+            const tipBPos = pos.clone().add(B.clone().multiplyScalar(binormalLength + 0.15));
+            spriteT.position.copy(tipTPos);
+            spriteN.position.copy(tipNPos);
+            spriteB.position.copy(tipBPos);
+
+            // update numeric labels and position them next to the arrow tips
+            updateLargeTextSprite(spriteT, 'Tangent', tColor, true);
+            updateLargeTextSprite(spriteN, 'Normal', nColor, true);
+            updateLargeTextSprite(spriteB, 'Bi-normal', bColor, true);
+            updateSpriteText(spriteTVal, 'T: ' + tangentLength.toFixed(2), tColor);
+            updateSpriteText(spriteNVal, 'N: ' + normalLength.toFixed(2), nColor);
+            updateSpriteText(spriteBVal, 'B: ' + binormalLength.toFixed(2), bColor);
+            spriteTVal.position.copy(pos).add(T.clone().multiplyScalar(tangentLength + 0.45));
+            spriteNVal.position.copy(pos).add(N.clone().multiplyScalar(normalLength + 0.45));
+            spriteBVal.position.copy(pos).add(B.clone().multiplyScalar(binormalLength + 0.45));
+
+            // Auto-view: move camera to keep arrows in view
+            if (autoView) {
+                // Frame the vector tip labels so all T/N/B annotations stay in view.
+                const focusPoint = new THREE.Vector3()
+                    .add(tipTPos)
+                    .add(tipNPos)
+                    .add(tipBPos)
+                    .multiplyScalar(1 / 3);
+                const maxLabelReach = Math.max(tangentLength, normalLength, binormalLength);
+                const distance = 10 + maxLabelReach * 0.9;
+                const cameraOffset = new THREE.Vector3(4, 4, 2.5).normalize().multiplyScalar(distance);
+                const desiredPos = focusPoint.clone().add(cameraOffset);
+                camera.position.lerp(desiredPos, 0.25);
+                controls.target.copy(focusPoint);
+                controls.update();
+            }
+            
+            // update stats panel
+            document.getElementById('stat-t').textContent = tangentLength.toFixed(3);
+            document.getElementById('stat-n').textContent = normalLength.toFixed(3);
+            document.getElementById('stat-b').textContent = binormalLength.toFixed(3);
+            document.getElementById('stat-r').textContent = R.toFixed(1);
+            document.getElementById('stat-p').textContent = P.toFixed(1);
+            document.getElementById('stat-speed').textContent = speed.toFixed(3);
+            document.getElementById('stat-loops').textContent = loopCount.toString();
 
             const trailPoints = [];
             const trailLength = 3.0; 
